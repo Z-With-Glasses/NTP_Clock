@@ -324,7 +324,7 @@ void testingFunction(){
 }
 bool checkAhrsData(){
   M5.IMU.getAhrsData(&pitch, &roll, &yaw);
-  if ((pitch > 20 && pitch < 30) && (roll < 0 && roll > -15) && !screenStatus)// [M5Stick] ^̌pitch<>roll 
+  if ((pitch > 20 && pitch < 50) && (roll < 5 && roll > -20) && !screenStatus)// [M5Stick] ^̌pitch<>roll 
   {return 1;}else{return 0;}                  
 }
 void setup(){
