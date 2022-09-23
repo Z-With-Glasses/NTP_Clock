@@ -1,7 +1,8 @@
-#include "M5StickCPlus.h"
-#include "Streaming.h"
-#include "time.h"
-#include "WiFi.h"
+#include <Wire.h>
+#include <M5StickCPlus.h>
+#include <Streaming.h>
+#include <time.h>
+#include <WiFi.h>
 
 RTC_TimeTypeDef RTC_TimeStruct;
 RTC_DateTypeDef RTC_DateStruct;
@@ -201,6 +202,10 @@ void displayBattery(){
         M5.Lcd.print("[<         ]");         
     }
 }
+void previousMeasure()
+{
+  
+}
 void displayTimeAndDate(){
     if (displayChange)
     M5.Lcd.fillScreen(TFT_BLACK);//clear screen
@@ -209,55 +214,56 @@ void displayTimeAndDate(){
     M5.Lcd.setTextColor(TFT_GREEN,TFT_BLACK);
     M5.Rtc.GetTime(&RTC_TimeStruct);
     M5.Rtc.GetData(&RTC_DateStruct);
-    M5.Lcd.setCursor(27, 0);
+    String date;
+    String time;
+    date += RTC_DateStruct.Year; date += '-'; date += RTC_DateStruct.Month; date += '-'; date += RTC_DateStruct.Date;
+    M5.Lcd.setCursor(0, 0);
+    M5.Lcd.drawString(date, ((M5.Lcd.width()/2)-(M5.Lcd.textWidth(date)/2)), 0, 1);
+    //M5.Lcd.printf("%04d-%02d-%02d", RTC_DateStruct.Year, RTC_DateStruct.Month, RTC_DateStruct.Date);
+    //M5.Lcd.setTextDatum(TC_DATUM);
     int dayOfWeekInt = (RTC_DateStruct.WeekDay);
-    char dayOfWeek[10];
+    String dayOfWeek = "";
     switch(dayOfWeekInt)
     {
         case 0:{
-        strcpy(dayOfWeek, "Sunday");}
+        dayOfWeek = "Sunday";}
         break;
         case 1:{
-        strcpy(dayOfWeek, "Monday");}
+        dayOfWeek = "Monday";}
         break;
         case 2:{
-        strcpy(dayOfWeek, "Tuesday");}
+        dayOfWeek = "Tuesday";}
         break;
         case 3:{
-        strcpy(dayOfWeek, "Wednesday");}
+        dayOfWeek = "Wednesday";}
         break;
         case 4:{
-        strcpy(dayOfWeek, "Thursday");}
+        dayOfWeek = "Thursday";}
         break;
         case 5:{
-        strcpy(dayOfWeek, "Friday");}
+        dayOfWeek = "Friday";}
         break;
         case 6:{
-        strcpy(dayOfWeek, "Saturday");}
+        dayOfWeek = "Saturday";}
         break;
     }
-    M5.Lcd.setTextColor(TFT_GREEN,TFT_BLACK);
-    M5.Lcd.setCursor(25, 0);
-    M5.Lcd.printf("%04d-%02d-%02d", RTC_DateStruct.Year, RTC_DateStruct.Month, RTC_DateStruct.Date);
-    M5.Lcd.setCursor(35, 29);
-    M5.Lcd.printf("%s", dayOfWeek);
     if (previousHours != RTC_TimeStruct.Hours || displayChange)//if hours has changed
     {
-        M5.Lcd.setCursor(43, 60);
+        M5.Lcd.setCursor(48, 30);
         M5.Lcd.setTextColor(TFT_BLACK,TFT_BLACK);
         M5.Lcd.printf("%02d:",previousHours);//print over previous hour with black
         M5.Lcd.setTextColor(TFT_GREEN,TFT_BLACK);
-        M5.Lcd.setCursor(43, 60);
+        M5.Lcd.setCursor(48, 30);
         M5.Lcd.printf("%02d:",RTC_TimeStruct.Hours);//print new hour in green
         previousHours=RTC_TimeStruct.Hours;//assign current hour to previous hour
     }
     if (previousMinutes != RTC_TimeStruct.Minutes || displayChange);//if minutes has changed
     {
-        M5.Lcd.setCursor(97, 60);
+        M5.Lcd.setCursor(102, 30);
         M5.Lcd.setTextColor(TFT_BLACK,TFT_BLACK);
         M5.Lcd.printf("%02d:",previousMinutes);
         M5.Lcd.setTextColor(TFT_GREEN,TFT_BLACK);
-        M5.Lcd.setCursor(97, 60);
+        M5.Lcd.setCursor(102, 29);
 //int cursorPositionMinutes = m5.Lcd.getCursorX();//get minutes cursor position
 //Serial << "minutes cursor-" << cursorPositionMinutes << '\n';//print minutes cursor postion to serial
         M5.Lcd.printf("%02d:",RTC_TimeStruct.Minutes);
@@ -265,16 +271,17 @@ void displayTimeAndDate(){
     }
     if (previousSeconds != RTC_TimeStruct.Seconds || displayChange);//if seconds has changed
     {
-        M5.Lcd.setCursor(151, 60);
+        M5.Lcd.setCursor(156, 30);
         M5.Lcd.setTextColor(TFT_BLACK,TFT_BLACK);
         M5.Lcd.printf("%02d",previousSeconds);
         M5.Lcd.setTextColor(TFT_GREEN,TFT_BLACK);
-        M5.Lcd.setCursor(151, 60);
+        M5.Lcd.setCursor(156, 30);
 //int cursorPositionSeconds = m5.Lcd.getCursorX();//get seconds cursor position
 //Serial << "seconds cursor-" << cursorPositionSeconds << '\n';//print seconds cursor postion to serial
         M5.Lcd.printf("%02d",RTC_TimeStruct.Seconds);    
         previousSeconds=RTC_TimeStruct.Seconds;
     }
+    M5.Lcd.drawString(dayOfWeek, ((M5.Lcd.width()/2)-(M5.Lcd.textWidth(dayOfWeek)/2)), 60, 1);
 }
 void testingFunction(){      
     Serial << "voltage: " << voltage << '\n';//battery voltage
