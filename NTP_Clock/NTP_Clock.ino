@@ -3,6 +3,8 @@
 #include <Streaming.h>
 #include <time.h>
 #include <WiFi.h>
+#include <ArduinoJson.h>
+#include <WiFiUdp.h>
 
 RTC_TimeTypeDef RTC_TimeStruct;
 RTC_DateTypeDef RTC_DateStruct;
@@ -29,20 +31,29 @@ bool chargingStatus = false;
 
 float pitch = 0.0F;
 float roll = 0.0F;
-float yaw = 0.0F;//uesless without magnetometer
+float yaw = 0.0F;//uesless without magnetometer but needed for getAhrsData()
+
+
+const char* ssid      = "SSID";
+const char* password  = "PASS";
+const char* ntpServer = "time.nist.gov";
+const long gmtOffset_sec = -28800;
+const int daylightOffset_sec = 3600;
+
+const int port = 38899;
+const char * ipAddress = "10.0.0.227";
+const char lightOn[] = "{\"method\":\"setState\",\"params\":{\"state\":true}}";
+const char lightOff[] = "{\"method\":\"setState\",\"params\":{\"state\":false}}";
+//const char lightOn[] = "{\"id\":1,\"method\":\"setPilot\",\"params\":{\"r\":0,\"g\":255,\"b\":0,\"dimming\":100}}";//blue
 
 void timeSync(){
-    const char* ssid      = "SSID";
-    const char* password  = "PASS";
-    const char* ntpServer = "time.nist.gov";
-    const long gmtOffset_sec = -28800;
-    const int daylightOffset_sec = 3600;
     M5.Lcd.setTextSize(2);
     M5.Lcd.setTextColor(TFT_GREEN,TFT_BLACK);
     M5.Lcd.setCursor(0, 0);
     M5.Lcd.printf("Connecting to %s...", ssid);
     WiFi.begin(ssid, password);  // Connect wifi and return connection status.
-    while (WiFi.status() != WL_CONNECTED)// If the wifi connection fails.  
+    millisPrevious = millisElapsed;
+    while (WiFi.status() != WL_CONNECTED)
     {
         delay(250);
         M5.Lcd.print(".");
@@ -93,13 +104,13 @@ void turnScreenOn(){
     Wire1.write(0x4d); // Enable LDO2, aka OLED_VDD
     Wire1.endTransmission();
     screenStatus = true;
-    displayChange=1;
+    displayChange = true;
 }
 void turnScreenOff(){
     setCpuFrequencyMhz(10);
     Wire1.beginTransmission(0x34);
     Wire1.write(0x12);
-    Wire1.write(0b01001011);  // Disable LDO2, aka OLED_VDD
+    Wire1.write(0x4B);  // Disable LDO2, aka OLED_VDD
     Wire1.endTransmission();
     screenStatus = false;
     M5.Axp.SetSleep();
@@ -202,14 +213,9 @@ void displayBattery(){
         M5.Lcd.print("[<         ]");         
     }
 }
-void previousMeasure()
-{
-  
-}
 void displayTimeAndDate(){
     if (displayChange)
-    M5.Lcd.fillScreen(TFT_BLACK);//clear screen
-    
+    M5.Lcd.fillScreen(TFT_BLACK);//clear screen    
     M5.Lcd.setTextSize(3);
     M5.Lcd.setTextColor(TFT_GREEN,TFT_BLACK);
     M5.Rtc.GetTime(&RTC_TimeStruct);
@@ -282,6 +288,78 @@ void displayTimeAndDate(){
         previousSeconds=RTC_TimeStruct.Seconds;
     }
     M5.Lcd.drawString(dayOfWeek, ((M5.Lcd.width()/2)-(M5.Lcd.textWidth(dayOfWeek)/2)), 60, 1);
+}
+WiFiUDP Udp;
+void lightControl(bool onOff)
+{
+    millisPrevious = millisElapsed;
+    M5.Lcd.println("Connecting to WiFi.");
+    WiFi.begin(ssid, password);
+    while (WiFi.status() != WL_CONNECTED) 
+    {
+      delay(250);
+      M5.Lcd.print(".");
+      millisElapsed = millis();
+      if (millisElapsed - millisPrevious >= 10000)
+      {
+        M5.Lcd.fillScreen(TFT_BLACK);
+        M5.Lcd.setCursor(0, 0);
+        M5.Lcd.println("Failed to connect.");
+        WiFi.disconnect(true);  // Disconnect wifi.  
+        WiFi.mode(WIFI_OFF);  // Set the wifi mode to off.
+        delay (1000);
+        return;
+       }
+    }
+    M5.Lcd.println("\nSending command.");
+    Udp.beginPacket(ipAddress, port);
+    if(onOff == true){
+      for (int i = 0; i <= strlen(lightOn); i++)
+        {
+        Udp.write(lightOn[i]);
+        }
+    }else{
+      for (int i = 0; i <= strlen(lightOff); i++)
+        {
+        Udp.write(lightOff[i]);
+        }
+    }
+    Udp.endPacket();
+    M5.Lcd.println("Command sent.");
+    delay(3000);
+    M5.Lcd.println("Disconnecting...");
+    WiFi.disconnect(true);  // Disconnect wifi.  
+    WiFi.mode(WIFI_OFF);  // Set the wifi mode to off.
+    delay(3000);
+}
+void lightControlScreen()
+{
+    M5.update(); //updates button status
+    bool isRunning = true;
+    M5.Lcd.fillScreen(TFT_BLACK);//clear screen
+    M5.Lcd.setTextSize(2); 
+    M5.Lcd.setTextColor(TFT_WHITE,TFT_BLACK);
+    M5.Lcd.setCursor(0,0);
+    M5.Lcd.println("Light On/Off");
+    while(isRunning)
+    {
+      M5.update(); //updates button status
+      if (M5.BtnA.isPressed())//light on
+      {
+        lightControl(true);
+        isRunning = false;
+      }
+      if (M5.BtnB.isPressed())//light off
+      {
+        lightControl(false);
+        isRunning = false;
+      }
+      if (M5.BtnB.pressedFor(2000))
+      {
+        isRunning=false;
+        testingFunctionStatus = 0;
+      }
+    }
 }
 void testingFunction(){      
     Serial << "voltage: " << voltage << '\n';//battery voltage
@@ -367,7 +445,13 @@ void loop(){
     if (M5.BtnB.pressedFor(3000))//hold B button for 3 seconds to start screen printing of testingFunction()
     {
         testingFunctionStatus = 2;
-        displayChange = 1;
+        displayChange = true;
+    }
+    if (M5.BtnA.pressedFor(3000) || testingFunctionStatus == 3)//swap to light control screen
+    {
+      testingFunctionStatus = 3;
+      displayChange = true;
+      lightControlScreen();
     }
     if (testingFunctionStatus > 0)//if serial(1) or screen(2) printing is enabled
     testingFunction();
@@ -396,6 +480,6 @@ void loop(){
                 testingFunction();
             }
         }
-        displayChange = 0;
+        displayChange = false;
     }
 }
